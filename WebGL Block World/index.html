@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <Title>WebGL with Three.js</Title>
+        <style>
+            body{margin: 0; overflow: hidden;}
+            canvas{width: 100%; height: 100%;}
+            #blocker{position: absolute; width: 100%; height: 100%;}
+            #instructions{width: 100%; height: 100%; display: box; box-orient: horizontal; 
+                box-pack: center; box-align: center; text-align: center; cursor: pointer;}
+        </style>
+    </head>
+    <body>
+        <script src="js/three.min.js"></script>
+        <script src="js/PointerLockControls.js"></script>
+        <div id="blocker">
+            <div id="instructions">
+                <span style="font-size:40px">Click to Play</span>
+            </div>
+        </div>
+        <script>
+            var scene;
+            var camera;
+            var renderer;
+            var blocker = document.getElementById('blocker');
+            var instructions = document.getElementById('instructions');
+            var pointerLock = 'pointerLockElement' in document;
+            var controls;
+            var controlsEnabled = false;
+            var foreward = false;
+            var backwards = false;
+            var left = false;
+            var right = false;
+            var time;
+            var velocity = new THREE.Vector3();
+            
+            init();
+            render();
+            
+            function init()
+            {   
+                scene = new THREE.Scene();
+                camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 1, 1000);
+                renderer = new THREE.WebGLRenderer();
+                
+                setUpPointerLock(); 
+                setUpControls();
+                setUpSkyBox();
+                setUpGround();
+                
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(renderer.domElement);
+            }
+            
+            function setUpPointerLock()
+            {
+                if(pointerLock)
+                {
+                    var element = document.body;
+
+                    var pointerLockChange = function(event)
+                    {
+                        if(document.pointerLockElement === element)
+                        {
+                            controlsEnabled = true;
+                            controls.enabled = true;
+                            blocker.style.display = 'none';
+                        }
+                        else
+                        {
+                            controlsEnabled = false;
+                            blocker.style.display = 'box';
+                            instructions.style.display = '';
+                        }
+                    }
+
+                    document.addEventListener('pointerLockChange', pointerLockChange, false);
+
+                    instructions.addEventListener('click', function(event)
+                    {
+                        instructions.style.display = 'none';
+
+                        element.requestPointerLock = element.requestPointerLock;
+
+                        element.requestPointerLock();
+                    }, false);
+                }
+                else
+                {
+                    instructions.innerHTML = 'Your browser does not support pointer lock';   
+                }
+            }
+            
+            function setUpControls()
+            {
+                controls = new THREE.PointerLockControls(camera);
+                scene.add(controls.getObject());
+                
+                var onKeyDown = function (event)
+                {
+                    switch (event.keyCode)
+                    {
+                        case 87: foreward = true;
+                            break;
+                        case 65: left = true;
+                            break;
+                        case 83: backwards = true;
+                            break;
+                        case 68: right = true;
+                            break;
+                    }
+                };
+                
+                var onKeyUp = function (event)
+                {
+                    switch (event.keyCode)
+                    {
+                        case 87: foreward = false;
+                            break;
+                        case 65: left = false;
+                            break;
+                        case 83: backwards = false;
+                            break;
+                        case 68: right = false;
+                            break;
+                    }
+                };
+                
+                document.addEventListener('keydown', onKeyDown, false);
+                document.addEventListener('keyup', onKeyUp, false);
+            }
+            
+            function setUpSkyBox()
+            {
+                var urls = ["Assets/sky_posX.jpg", "Assets/sky_negX.jpg", "Assets/sky_posY.jpg",
+                            "Assets/sky_negY.jpg", "Assets/sky_posZ.jpg", "Assets/sky_negZ.jpg"];
+                var skyCube = THREE.ImageUtils.loadTextureCube(urls);
+
+                var shader = THREE.ShaderLib["cube"];
+                shader.uniforms["tCube"].value = skyCube;
+                var uniforms = THREE.UniformsUtils.clone(shader.uniforms);
+                var material = new THREE.ShaderMaterial({
+                        fragmentShader:shader.fragmentShader,
+                        vertexShader:shader.vertexShader,
+                        uniforms:shader.uniforms,
+                        depthWrite:false,
+                        side:THREE.BackSide});
+
+
+                var skyboxMesh = new THREE.Mesh(new THREE.CubeGeometry(500,500,500), material);
+
+                material.needsUpdate = true;
+                scene.add(skyboxMesh);
+            }
+            
+            function setUpGround()
+            { 
+                var texture = new THREE.ImageUtils.loadTexture("Assets/grass.jpg");
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.wrapT = THREE.RepeatWrapping;
+                texture.repeat.set(200,200);
+                
+                var material = new THREE.MeshBasicMaterial({map: texture});
+                var geometry = new THREE.Mesh(new THREE.PlaneGeometry(2000,2000), material);
+                geometry.rotateX(- Math.PI/2);
+                
+                scene.add(geometry);
+            }
+            
+            function render() 
+            {
+                requestAnimationFrame( render );
+                
+                if(controlsEnabled)
+                {
+                    var newTime = performance.now();
+                    var delta = (newTime - time) / 1000;
+                    
+                    velocity.x -= velocity.x * 10.0 * delta;
+                    velocity.z -= velocity.z * 10.0 * delta;
+                    
+                    if(foreward)
+                    {
+                        velocity.z -= 400.0 * delta;   
+                    }
+                    if(backwards)
+                    {
+                        velocity.z += 400.0 * delta;   
+                    }
+                    if(left)
+                    {
+                        velocity.x -= 400.0 * delta;   
+                    }
+                    if(right)
+                    {
+                        velocity.x += 400.0 * delta;   
+                    }
+                    
+                    controls.getObject().translateX(velocity.x * delta);
+                    controls.getObject().translateY(velocity.y * delta);
+                    controls.getObject().translateZ(velocity.z * delta);
+                    
+                    time = newTime;
+                }
+                
+                renderer.render( scene, camera );
+            }
+            
+        </script>
+    </body>
+</html>
